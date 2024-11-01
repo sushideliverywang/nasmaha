@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if form.instance.category_id %}Edit Category{% else %}Add Category{% endif %}
+{% endblock%}
+
+{% block content %}
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <div class="container-fluid add-form-list">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        <div class="header-title">
+                            <h4 class="card-title">{% if form.instance.category_id %}Edit Category{% else %}Add Category{% endif %}</h4>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <form action="category_list.html" data-toggle="validator">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Category Name</label>
+                                        {{ form.name }}
+                                        <div class="help-block with-errors"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Parent Category</label>
+                                        {{ form.parent_category }}
+                                    </div>
+                                </div>
+
+                            </div>
+                        </form>
+                        <button type="submit" class="btn btn-primary mr-2">Save</button>
+                        <a href="{% url 'category_list' %}" class="btn btn-danger mr-2">Cancel</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+    document.getElementById("category-list").className = "active";
+</script>
+
+{% endblock %}

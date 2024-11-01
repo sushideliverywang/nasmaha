@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block title %}
+{% if edit_mode %}Edit Product Model{% else %}Add Product Model{% endif %}
+{% endblock%}
+
+{% block content %}
+<form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <div class="container-fluid add-form-list">
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between sticky-header fixed" style="position: sticky; top: 0; background: #fff; z-index: 10;">
+                        <div class="header-title">
+                            {% if edit_mode %}
+                                <h4 class="card-title">Edit Product Model -- <span style="font-family: Arial, sans-serif; font-size: 24px; color: rgb(53, 162, 193);">
+                                        {{ product_model }}
+                                    </span>
+                                </h4>
+                            {% else %}
+                                <h4 class="card-title">Add New Product Model</h4>
+                            {% endif %}
+                        </div>
+                        <div class="action-buttons">
+                            <button type="submit" name="save_product_model" class="btn btn-primary">Save</button>
+                            <a href="{% url 'product_model_list' %}" class="btn btn-danger mr-2">Cancel</a>
+                        </div>
+                    </div>
+
+                    <div class="card-body">
+                        <div class="error-messages">
+                            {% for field in form %}
+                            {% if field.errors %}
+                            <div class="alert alert-danger">
+                                <strong>{{ field.label }}:</strong> {{ field.errors|striptags }}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label>Model Number</label>
+                                    {{ form.model_number }}
+                                </div>
+                                <div class="form-group">
+                                    <label>MSRP</label>
+                                    {{ form.msrp }}
+                                </div>
+                                <div class="form-group">
+                                    <label>Discount Price</label>
+                                    {{ form.discount_price }}
+                                </div>
+                                <div class="form-group">
+                                    <label>Brand</label>
+                                    {{ form.brand }}
+                                </div>
+                                <div class="form-group">
+                                    <label>Category</label>
+                                    {{ form.category }}
+                                </div>
+                                <div class="form-group">
+                                    <label> Official Link</label>
+                                    {{ form.link }}
+                                </div>
+                                <div class="form-group">
+                                    <div class="container">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <a class="btn btn-danger mr-2" id="scraperButton" onclick="scraperThisModel('{{ product_model.product_model_id }}')">Scraper This Model To Update</a>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <a class="btn btn-primary mr-2" href='{{ form.link.value }}' target="_blank" rel="noopener noreferrer">Open This Link to Check</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {% if edit_mode %}
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between">
+                                        <div class="header-title">
+                                            <h4 class="card-title">Uploaded Model Images</h4>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            {% for image in existing_images %}
+                                            <div class="col-md-3 text-center">
+                                                <img src="{{ image.image.url }}" alt="Product Image" style="max-width: 100px; transition: opacity 0.3s ease;" id="image_{{ image.product_image_id }}" />
+                                                <label for="delete_{{ image.product_image_id }}" style="margin: 10px;" class="btn btn-danger">Delete</label>
+                                                <input type="checkbox" name="delete_images" value="{{ image.product_image_id }}" id="delete_{{ image.product_image_id }}" onclick="toggleImageOpacity('{{ image.product_image_id }}')">
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+
+
+                                </div>
+                                {% endif %}
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between">
+                                        <div class="header-title">
+                                            <h4 class="card-title">Select New Model Images</h4>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-group">
+                                            <input type="file" id="id_images" name="images" multiple
+                                                class="form-input-group">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between">
+                                        <div class="header-title">
+                                            <h4 class="card-title">Description</h4>
+                                        </div>
+                                    </div>
+                                    <div class="card-body">
+                                        {{ form.description }}
+                                    </div>
+                                </div>
+                                {% if edit_mode %}
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between">
+                                        <div class="header-title">
+                                            <h4 class="card-title">Product Specifications</h4>
+                                        </div>
+                                    </div>
+                                    <div class="card-body" id="specifications-container">
+                                        {% for spec in product_model.productspec_set.all %}
+                                        <div class="container" id="spec-{{ spec.pk }}">
+                                            <input type="hidden" name="spec_ids" value="{{ spec.pk }}">
+                                            <div class="row">
+                                                <div class="col-9">
+                                                    <div class="form-group mr-3">
+                                                        <input type="text" name="spec_names" value="{{ spec.spec.name }}" class="form-control" readonly>
+                                                    </div>
+                                                </div>
+                                                <div class="col-3">
+                                                    <div class="form-check form-switch" >
+                                                        <input type="checkbox" class="form-check-input mr-2"
+                                                            style="transform: scale(1.5); margin-top: 20px;" name="delete_specs"
+                                                            value="{{ spec.pk }}" id="delete_spec_{{ spec.pk }}">
+                                                        <label class="form-check-label btn btn-danger mb-0" style="margin: 10px;" for="delete_spec_{{ spec.pk }}">Delete</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-12">
+                                                    <div class="form-group mr-3" >
+                                                        <input type="text" name="spec_values" value="{{ spec.value }}" class="form-control">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <hr>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                               
+                                <div class="card">
+                                    <div class="card-header d-flex justify-content-between">
+                                        <h4 class="card-title">Add New Specification</h4>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="form-group">
+                                            <label>Specification Name</label>
+                                            <input type="text" id="new_spec_name" class="form-control">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Value</label>
+                                            <input type="text" id="new_spec_value" class="form-control">
+                                        </div>
+                                        <button type="button" class="btn btn-primary" onclick="addNewSpec()">Add Specification</button>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>                
+            </div>
+        </div>
+    </div>
+    <div class="fixed-action-buttons" style="position: fixed; bottom: 0; right: 0; width: 100%; background: white; z-index: 20; padding: 10px; box-shadow: 0px -2px 5px rgba(0,0,0,0.1);">
+        <div class="container d-flex justify-content-end">
+            <button type="submit" name="save_product_model" class="btn btn-primary">Save</button>
+            <a href="{% url 'product_model_list' %}" class="btn btn-danger ml-2">Cancel</a>
+        </div>
+    </div>
+</form>
+
+<script>
+    function addNewSpec() {
+        const name = document.getElementById('new_spec_name').value.trim();
+        const value = document.getElementById('new_spec_value').value.trim();
+
+        if (!name || !value) {
+            alert("Specification Name and Value cannot be empty!");
+            return;
+        }
+
+        const container = document.getElementById('specifications-container');
+
+        const specDiv = document.createElement('div');
+        specDiv.className = 'spec-item';
+        specDiv.style.opacity = '0'; // 初始设为透明
+        specDiv.style.transition = 'opacity 1s ease';
+
+        const nameLabel = document.createElement('label');
+        nameLabel.textContent = 'Specification Name: ';
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.name = 'new_spec_names';
+        nameInput.value = name;
+        nameInput.className = 'form-control';
+        nameInput.readOnly = true;
+
+        const valueLabel = document.createElement('label');
+        valueLabel.textContent = 'Value: ';
+        const valueInput = document.createElement('input');
+        valueInput.type = 'text';
+        valueInput.name = 'new_spec_values';
+        valueInput.value = value;
+        valueInput.className = 'form-control';
+
+        specDiv.appendChild(nameLabel);
+        specDiv.appendChild(nameInput);
+        specDiv.appendChild(valueLabel);
+        specDiv.appendChild(valueInput);
+
+        container.appendChild(specDiv);
+
+        // 添加后渐变显示
+        setTimeout(() => {
+            specDiv.style.opacity = '1';
+        }, 100);
+
+        // 清空输入框
+        document.getElementById('new_spec_name').value = '';
+        document.getElementById('new_spec_value').value = '';
+    }
+
+    function toggleImageOpacity(imageId) {
+        const imgElement = document.getElementById('image_' + imageId);
+        const checkbox = document.getElementById('delete_' + imageId);
+        if (checkbox.checked) {
+            imgElement.style.opacity = '0.3'; // 图片变淡，表示待删除
+        } else {
+            imgElement.style.opacity = '1'; // 恢复正常
+        }
+    }
+
+    function scraperThisModel(productModelId) {
+        // 打印 productModelId，确保其值正确
+        console.log("Product Model ID:", productModelId);
+        alert("Product Model ID: " + productModelId);
+
+        if (confirm("Are you sure you want to scrape and update this model?")) {
+            fetch('/product/scraper/update-model/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}', // CSRF 令牌确保安全
+                },
+                body: JSON.stringify({ 
+                    'product_model_id': productModelId
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert("Scraper started successfully.");
+                } else {
+                    alert("Failed to start scraper. Please try again later.");
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("An error occurred. Please try again.");
+            });
+        }
+    }
+
+</script>
+<script>
+    document.getElementById("product_model_list").className = "active";
+</script>
+{% endblock %}

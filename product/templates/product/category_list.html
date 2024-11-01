@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Category
+{% endblock%}
+
+{% block content %}
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
+                <div>
+                    <h4 class="mb-3">Category List</h4>
+                    <p class="mb-0">Use category list as to view your overall product's category <br>
+                    </p>
+                </div>
+                <a href="{% url 'category_add' %}" class="btn btn-primary add-list"><i class="las la-plus mr-3"></i>Add New Category</a>
+            </div>
+        </div>
+        <div class="col-lg-12">
+            <div class="table-responsive rounded mb-3">
+                <table class="data-table table mb-0 tbl-server-info">
+                    <thead class="bg-white text-uppercase">
+                        <tr class="bg-warning ligth ligth-data">
+                            <th style="width: 50px;">Category Name</th>
+                            <th style="width: 50px;">Parent Category</th>
+                            <th style="width: 50px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="ligth-body">
+                        {% for categories in categories %}
+                        <tr>
+                            <td>{{ categories.name }}</td>
+                            <td>{{ categories.parent_category }}</td>
+                            <td>
+                                <a href="{% url 'category_edit' categories.category_id %}" class="btn btn-primary mb-0"> Edit </a> 
+                                <a href="{% url 'category_delete' categories.category_id %}" class="btn btn-danger mb-0">Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    document.getElementById("category-list").className = "active";
+</script>
+{% endblock %}

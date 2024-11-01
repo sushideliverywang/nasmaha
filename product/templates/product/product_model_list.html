@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+
+{% block title %}
+Product Model
+{% endblock%}
+
+{% block content %}
+<div class="container-fluid">
+    <style>
+        .data-table tbody tr {
+            line-height: 1.0 !important;
+            height: 10px !important;
+            border-width: 1px !important;
+        }
+        .data-table tbody td {
+            padding: 5px 8px !important;
+            border-width: 1px !important;
+        }
+        /* 淡出效果的样式 */
+        .fade-out {
+        transition: opacity 2s ease-in-out;
+        opacity: 0; /* 使用透明度来逐渐消失 */
+        }
+    </style>    
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
+                <div>
+                    <h4 class="mb-3">Product Model List</h4>
+                    <p class="mb-0">Use Product Model list to view your overall product's model.<br></p>
+                </div>
+                <a href="{% url 'product_model_add' %}" class="btn btn-primary add-list"><i class="las la-plus mr-3"></i>Add New Model</a>
+            </div>
+        </div>
+
+        <div class="col-lg-12">
+            <div class="mb-3">
+                <span id="resultCount">Showing all results</span>
+            </div>
+            
+            <div class="table-responsive rounded mb-3">
+                <table class="data-table table mb-0 tbl-server-info table-bordered">
+                    <thead class="bg-white text-uppercase">
+                        <tr class="bg-warning light light-data">
+                            <th scope="col" style="width: 150px;">
+                                Model Number
+                                <input type="text" id="modelNumberSearch" class="form-control mt-2" placeholder="Search by model number...">
+                            </th>
+                            <th scope="col" style="width: 150px;">
+                                MSRP
+                                <div class="d-flex mt-2">
+                                    <input type="text" pattern="\d*" id="msrpMin" class="form-control mr-1" placeholder="Min MSRP">
+                                    <input type="text" pattern="\d*" id="msrpMax" class="form-control" placeholder="Max MSRP">
+                                </div>
+                            </th>
+                            <th scope="col" style="width: 150px;">
+                                Discount Price
+                                <div class="d-flex mt-2">
+                                    <input type="text" pattern="\d*" id="discountPriceMin" class="form-control mr-1" placeholder="Min">
+                                    <input type="text" pattern="\d*" id="discountPriceMax" class="form-control" placeholder="Max">
+                                </div>
+                            </th>
+                            <th scope="col" style="width: 150px;">
+                                Brand
+                                <select class="form-control mt-2" id="brandFilter">
+                                    <option value="">All Brands</option>
+                                    {% for brand in brands %}
+                                    <option value="{{ brand|lower }}">{{ brand }}</option>
+                                    {% endfor %}
+                                </select>
+                            </th>
+                            <th scope="col" style="width: 150px;">
+                                Category
+                                <select class="form-control mt-2" id="categoryFilter">
+                                    <option value="">All Categories</option>
+                                    {% for parent, children in category_dict.items %}
+                                        <option value="{{ parent.category_id }}">{{ parent.name }}</option>
+                                        {% for child in children %}
+                                            <option value="{{ child.category_id }}">&nbsp;&nbsp;&nbsp;{{ child.name }}</option>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </select>
+                            </th>
+                            <th scope="col" style="width: 150px;">
+                                Actions
+                                <br>
+                                <button id="clearFilters" class="btn btn-primary mt-2">Clear All Filters</button>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="light-body">
+                        {% for model in product_model %}
+                        <tr data-category-id="{{ model.category.category_id }}" data-product-id="{{ model.product_model_id }}">
+                            <td>{{ model.model_number }}</td>
+                            <td>{{ model.msrp }}</td>
+                            <td>{{ model.discount_price }}</td>
+                            <td>{{ model.brand }}</td>
+                            <td>{{ model.category.name }}</td>
+                            <td>
+                                <a href="{% url 'product_model_edit' model.product_model_id %}" class="btn btn-primary" onclick="saveFilters(); setFromEditFlag(); saveEditedProductId('{{ model.product_model_id }}');">
+                                    <i class="las la-edit"></i> Edit
+                                </a>
+                                <a href="{% url 'product_model_delete' model.product_model_id %}" class="btn btn-danger" onclick="saveFilters(); setFromEditFlag(); saveEditedProductId('{{ model.product_model_id }}');">
+                                    <i class="las la-trash-alt"></i> Delete
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById("product_model_list").className = "active";
+</script>
+
+<script>
+    // 初始化表格并填充过滤器选项
+    document.addEventListener("DOMContentLoaded", function() {
+        filterTable(); // 初始化过滤表格
+    });
+    
+    // 过滤表格函数，基于用户输入的条件
+    function filterTable() {
+        let modelNumberValue = document.getElementById("modelNumberSearch").value.toLowerCase();
+        let msrpMinValue = parseFloat(document.getElementById("msrpMin").value) || 0;
+        let msrpMaxValue = parseFloat(document.getElementById("msrpMax").value) || Infinity;
+        let discountPriceMinValue = parseFloat(document.getElementById("discountPriceMin").value) || 0;
+        let discountPriceMaxValue = parseFloat(document.getElementById("discountPriceMax").value) || Infinity;
+        let brandFilterValue = document.getElementById("brandFilter").value.toLowerCase();
+        let categoryFilterValue = document.getElementById("categoryFilter").value;
+    
+        let table = document.querySelector(".data-table tbody");
+        let rows = table.getElementsByTagName("tr");
+    
+        // 获取所有子分类ID，若选择了一个父分类，则包括其所有子分类
+        let selectedCategoryElement = document.querySelector(`#categoryFilter option[value="${categoryFilterValue}"]`);
+        let childCategoryIds = [];
+    
+        if (selectedCategoryElement) {
+            // 如果选择了一个父分类，找到其所有子分类
+            let isParentCategory = !selectedCategoryElement.textContent.startsWith('\u00a0\u00a0\u00a0'); // 没有缩进的分类是父分类
+            if (isParentCategory) {
+                let siblingOptions = Array.from(document.querySelectorAll(`#categoryFilter option`));
+                let foundParent = false;
+    
+                siblingOptions.forEach(option => {
+                    if (option.value === categoryFilterValue) {
+                        foundParent = true;
+                    } else if (foundParent && !option.textContent.startsWith('\u00a0\u00a0\u00a0')) {
+                        // 遇到下一个没有缩进的父分类，停止
+                        foundParent = false;
+                    } else if (foundParent && option.textContent.startsWith('\u00a0\u00a0\u00a0')) {
+                        // 如果是当前父分类的子分类，添加到子分类ID列表中
+                        childCategoryIds.push(option.value);
+                    }
+                });
+            }
+        }
+    
+        for (let i = 0; i < rows.length; i++) {
+            let cells = rows[i].getElementsByTagName("td");
+    
+            let modelNumberMatch = !modelNumberValue || (cells[0] && cells[0].textContent.toLowerCase().indexOf(modelNumberValue) > -1);
+            let msrpValue = parseFloat(cells[1].textContent) || 0;
+            let msrpMatch = msrpValue >= msrpMinValue && msrpValue <= msrpMaxValue;
+            let discountPriceValue = parseFloat(cells[2].textContent) || 0;
+            let discountPriceMatch = discountPriceValue >= discountPriceMinValue && discountPriceValue <= discountPriceMaxValue;
+            let brandMatch = !brandFilterValue || (cells[3] && cells[3].textContent.toLowerCase() === brandFilterValue);
+            
+            let categoryMatch = true;
+            if (categoryFilterValue) {
+                let rowCategoryId = rows[i].dataset.categoryId; // 获取每行的分类 ID
+                
+                // 判断是否匹配父分类或其子分类
+                categoryMatch = (rowCategoryId === categoryFilterValue) || childCategoryIds.includes(rowCategoryId);
+            }
+    
+            if (modelNumberMatch && msrpMatch && discountPriceMatch && brandMatch && categoryMatch) {
+                rows[i].style.display = ""; // 显示匹配的行
+            } else {
+                rows[i].style.display = "none"; // 隐藏不匹配的行
+            }
+        }
+    
+        updateResultCount(); // 更新搜索结果数量
+    }
+    
+    // 更新搜索结果数量
+    function updateResultCount() {
+        let table = document.querySelector(".data-table tbody");
+        let rows = table.getElementsByTagName("tr");
+        let visibleCount = 0;
+    
+        for (let i = 0; i < rows.length; i++) {
+            if (rows[i].style.display !== "none") {
+                visibleCount++;
+            }
+        }
+    
+        document.getElementById("resultCount").textContent = "Search Results: " + visibleCount;
+    }
+    
+    // 监听过滤器的更改
+    document.getElementById("modelNumberSearch").addEventListener("keyup", filterTable);
+    document.getElementById("msrpMin").addEventListener("input", filterTable);
+    document.getElementById("msrpMax").addEventListener("input", filterTable);
+    document.getElementById("discountPriceMin").addEventListener("input", filterTable);
+    document.getElementById("discountPriceMax").addEventListener("input", filterTable);
+    document.getElementById("brandFilter").addEventListener("change", filterTable);
+    document.getElementById("categoryFilter").addEventListener("change", filterTable);
+    document.getElementById("clearFilters").addEventListener("click", function() {
+        document.getElementById("modelNumberSearch").value = "";
+        document.getElementById("msrpMin").value = "";
+        document.getElementById("msrpMax").value = "";
+        document.getElementById("discountPriceMin").value = "";
+        document.getElementById("discountPriceMax").value = "";
+        document.getElementById("brandFilter").value = "";
+        document.getElementById("categoryFilter").value = "";
+        filterTable(); // 重新应用过滤器，显示所有行
+        localStorage.removeItem('productModelFilters'); // 清空保存的过滤条件
+        localStorage.removeItem('productModelScroll'); // 清空保存的滚动位置
+    });
+
+    function saveFilters() {
+        let filters = {
+            modelNumber: document.getElementById("modelNumberSearch").value,
+            msrpMin: document.getElementById("msrpMin").value,
+            msrpMax: document.getElementById("msrpMax").value,
+            discountPriceMin: document.getElementById("discountPriceMin").value,
+            discountPriceMax: document.getElementById("discountPriceMax").value,
+            brand: document.getElementById("brandFilter").value,
+            category: document.getElementById("categoryFilter").value,
+        };
+        localStorage.setItem('productModelFilters', JSON.stringify(filters));
+    }
+
+    function loadFilters() {
+        let filters = JSON.parse(localStorage.getItem('productModelFilters'));
+        if (filters) {
+            document.getElementById("modelNumberSearch").value = filters.modelNumber || "";
+            document.getElementById("msrpMin").value = filters.msrpMin || "";
+            document.getElementById("msrpMax").value = filters.msrpMax || "";
+            document.getElementById("discountPriceMin").value = filters.discountPriceMin || "";
+            document.getElementById("discountPriceMax").value = filters.discountPriceMax || "";
+            document.getElementById("brandFilter").value = filters.brand || "";
+            document.getElementById("categoryFilter").value = filters.category || "";
+        }
+    }
+
+    window.addEventListener("scroll", function() {
+        localStorage.setItem('productModelScroll', window.scrollY);
+    });
+
+    function restoreScrollPosition() {
+        let scrollPosition = localStorage.getItem('productModelScroll');
+        if (scrollPosition) {
+            window.scrollTo(0, parseInt(scrollPosition));
+        }
+    }
+
+    function setFromEditFlag() {
+        localStorage.setItem('fromEdit', 'true');
+    }
+
+    function saveEditedProductId(productId) {
+        localStorage.setItem('editedProductId', productId);
+    }
+
+    function highlightEditedRow() {
+        let editedProductId = localStorage.getItem('editedProductId');
+        if (editedProductId) {
+            let editedRow = document.querySelector(`tr[data-product-id='${editedProductId}']`);
+            if (editedRow) {
+                // 立即高亮显示
+                editedRow.style.backgroundColor = '#ffcc80'; // 亮黄色，高亮颜色
+                // 2秒后开始渐变消失
+                setTimeout(() => {
+                    editedRow.classList.add('fade-out'); // 添加淡出类，透明度逐渐变淡
+
+                    // 在渐变结束后，清除颜色和类
+                    setTimeout(() => {
+                        editedRow.style.backgroundColor = '';
+                        editedRow.classList.remove('fade-out');
+                    }, 1000); // 1秒后清除类，确保动画结束
+                }, 2000); // 1秒后开始淡出动画
+            }
+            localStorage.removeItem('editedProductId'); // 清除已编辑的产品 ID
+        }
+    }
+
+
+    document.addEventListener("DOMContentLoaded", function() {
+        if (localStorage.getItem('fromEdit') === 'true') {
+            loadFilters(); // 加载上次保存的过滤条件
+            filterTable(); // 应用过滤条件
+            restoreScrollPosition(); // 恢复上次保存的滚动位置
+            highlightEditedRow(); // 高亮最近编辑的行
+            localStorage.removeItem('fromEdit'); // 清除标志，确保下一次进入时不再执行
+        } else {
+            filterTable(); // 初始化过滤表格
+        }
+    });
+
+
+</script>
+    
+
+{% endblock %}
